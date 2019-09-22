@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Test if a port has been specified
+test -n "$1" || { echo "$0 <port>"; exit 1; }
+
+PORT=$1
+
+# EXAMPLE: Terminates the DCOS slave process and prevents systemd from
+# restarting it. Returns 'OK' if the slave has been terminated.
+function terminate_dcos_slave () {
+  systemctl kill -s SIGUSR1 dcos-mesos-slave && systemctl stop dcos-mesos-slave
+
+  if [ $? != 0 ]; then
+    echo "1:200"
+  else
+    echo "0:OK"
+  fi
+}
+
+# The actual command server loop with all available commands
+function cmd_server () {
+  while true ; do
+    read msg
+    case $msg in
+      TERMINATE )
+      terminate_dcos_slave ;;
+      * )
+      echo "1:100"
+    esac
+  done
+}
+
+coproc CS { cmd_server; }
+
+netcat -l $PORT -k <&${CS[0]} >&${CS[1]}
